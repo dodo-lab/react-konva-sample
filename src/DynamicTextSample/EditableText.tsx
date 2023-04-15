@@ -1,7 +1,9 @@
 import Konva from "konva";
 import React, { useRef, useEffect, useCallback } from "react";
-import { Text, Transformer } from "react-konva";
-import { Html } from "react-konva-utils"
+import { Text, Transformer, Circle, Image } from "react-konva";
+import { Html, useImage } from "react-konva-utils"
+import fontSizeUpIcon from './font-size-up-icon.png';
+import fontSizeDownIcon from './font-size-down-icon.png';
 
 const EDITOR_MIN_HEIGHT = 30;
 
@@ -10,28 +12,42 @@ export const PreviewAndTransformer: React.FC<{
   y:number;
   setPosition: (x:number, y:number)=> void;
 
+  fontSize: number;
+  upFontSize: () => void
+  downFontSize: () => void
+
   width:number;
   height:number;
   setSize:((newWidth: number, newHeight: number) => void);
+
+  isBold: boolean
+  toggleBold: () => void;
 
   text:string;
   isSelected:boolean;
   startTransforming: () => void;
   startEditing: () => void;
+  remove: () => void;
 }> = ({
   x,
   y,
   setPosition,
+  fontSize,
+  upFontSize,
+  downFontSize,
 
   width,
   height,
   setSize,
 
   text,
+  isBold,
+  toggleBold,
   isSelected,
 
   startTransforming,
   startEditing,
+  remove,
 }) => {
   const textRef = useRef<Konva.Text>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -67,6 +83,10 @@ export const PreviewAndTransformer: React.FC<{
     handleResize();
   }, [handleResize]);
 
+  const deleteButtonRef = React.useRef<Konva.Circle>(null);
+  const [fontSizeUpIconImage] = useImage(fontSizeUpIcon)
+  const [fontSizeDownIconImage] = useImage(fontSizeDownIcon)
+
   return (
     <>
       <Text
@@ -74,13 +94,16 @@ export const PreviewAndTransformer: React.FC<{
         // 位置
         x={x}
         y={y}
+        fontSize={fontSize}
+        lineHeight={1.4}
         draggable
         onDragEnd={(e) => setPosition(e.target.x(),e.target.y())}
         // サイズ
         width={width}
         height={height}
         // テキスト文字列
-        text={text}        
+        text={text}
+        fontStyle={isBold ? "bold" : "normal"}
         // シングル→変形、ダブル→編集
         onClick={startTransforming}
         onTap={startTransforming}
@@ -90,7 +113,6 @@ export const PreviewAndTransformer: React.FC<{
         // その他スタイル
         fill="black"
         fontFamily="sans-serif"
-        fontSize={24}
         perfectDrawEnabled={false}
       />
       { isSelected && (
@@ -101,7 +123,92 @@ export const PreviewAndTransformer: React.FC<{
           flipEnabled={false}
           enabledAnchors={['middle-right','middle-left']}
           boundBoxFunc={(_, newBox) => ({...newBox, width: Math.max(EDITOR_MIN_HEIGHT, newBox.width)})}
-        />
+        >
+          <Circle
+            radius={8}
+            fill="red"
+            ref={deleteButtonRef}
+            onClick={remove}
+            x={textRef.current ? textRef.current.width() : 0}
+          />
+          <Image
+            image={fontSizeUpIconImage}
+            x={10}
+            y={textRef.current ? textRef.current.height() - 10 : 0}
+            width={36}
+            height={36}
+            shadowColor="gray"
+            shadowOffsetX={0}
+            shadowOffsetY={0}
+            shadowBlur={1}
+            onMouseOver={(e) => {
+              const shape = e.target;
+              document.body.style.cursor = 'pointer';
+              shape.scaleX(1.1);
+              shape.scaleY(1.1);
+            }}
+            onMouseOut={(e) => {
+              const shape = e.target;
+              document.body.style.cursor = 'default';
+              shape.scaleX(1);
+              shape.scaleY(1);
+            }}
+            onClick={upFontSize}
+          />
+
+          <Image
+            image={fontSizeDownIconImage}
+            x={55}
+            y={textRef.current ? textRef.current.height() - 10 : 0}
+            width={32}
+            height={32}
+            shadowColor="gray"
+            shadowOffsetX={0}
+            shadowOffsetY={0}
+            shadowBlur={1}
+            onMouseOver={(e) => {
+              const shape = e.target;
+              document.body.style.cursor = 'pointer';
+              shape.scaleX(1.1);
+              shape.scaleY(1.1);
+            }}
+            onMouseOut={(e) => {
+              const shape = e.target;
+              document.body.style.cursor = 'default';
+              shape.scaleX(1);
+              shape.scaleY(1);
+            }}
+            onClick={downFontSize}
+          />
+
+          <Text
+            text="B" 
+            x={100}
+            y={textRef.current ? textRef.current.height() - 5 : 0}
+            width={32}
+            height={32}
+            fontSize={20}
+            fill={isBold ? "black" : "gray"}
+            shadowColor="gray"
+            shadowOffsetX={0}
+            shadowOffsetY={0}
+            shadowBlur={1}
+            fontStyle={isBold ? "bold": "normal"}
+            onClick={toggleBold}
+            onMouseOver={(e) => {
+              const shape = e.target;
+              document.body.style.cursor = 'pointer';
+              shape.scaleX(1.1);
+              shape.scaleY(1.1);
+            }}
+            onMouseOut={(e) => {
+              const shape = e.target;
+              document.body.style.cursor = 'default';
+              shape.scaleX(1);
+              shape.scaleY(1);
+            }}
+          />
+        </Transformer>
       )}
     </>
   );
@@ -117,16 +224,18 @@ export const Editor: React.FC<{
   y:number;
   width:number;
   height:number;
-  value: string;
-  setValue: (val: string) => void;
+  text: string;
+  fontSize: number;
+  setText: (val: string) => void;
   finishEditing: () => void;
 }> = ({
   x,
   y,
   width,
   height,
-  value,
-  setValue,
+  fontSize,
+  text,
+  setText,
   finishEditing,
 }) => {
   const wrapperStyle = { 
@@ -137,7 +246,7 @@ export const Editor: React.FC<{
   };
 
   const wrapperPosition = { x: x - offset, y: y - offset };
-  const style = getStyle(width, height);
+  const style = getStyle(width, height, fontSize);
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.code === 'Enter' && !e.shiftKey) || e.code === 'Escape') {
@@ -145,12 +254,12 @@ export const Editor: React.FC<{
     }
   }, [finishEditing])
 
-  const onChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setValue(e.currentTarget.value),[setValue]);
+  const onChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setText(e.currentTarget.value),[setText]);
 
   return (
     <Html groupProps={wrapperPosition} divProps={{ style:  wrapperStyle}}>
       <textarea
-        value={value}
+        value={text}
         onChange={onChange}
         onKeyDown={onKeyDown}
         style={style}
@@ -160,7 +269,7 @@ export const Editor: React.FC<{
   );
 }
 
-function getStyle(width: number, height:number) {
+function getStyle(width: number, height:number, fontSize: number) {
   const isFirefox = navigator.userAgent.toLowerCase().indexOf("firefox") > -1;
   return {
     width,
@@ -172,8 +281,8 @@ function getStyle(width: number, height:number) {
     outline: 'none',
     resize: 'none' as const,
     colour: 'black',
-    fontSize: '24px',
-    lineHeight: '1',
+    fontSize: `${fontSize}px`,
+    lineHeight: '1.4',
     fontFamily: 'sans-serif',
     backgroundColor: inputBackgroundColor,
     ...(!isFirefox && {margintop: "-4px"})
