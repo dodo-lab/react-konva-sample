@@ -1,6 +1,6 @@
 import React from 'react';
 import './App.css';
-import { DynamicText } from './DynamicTextSample/DynamicText';
+import DynamicText from './DynamicTextSample';
 import { Box } from '@mui/material';
 
 function App() {

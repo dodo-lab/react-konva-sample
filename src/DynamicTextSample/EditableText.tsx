@@ -1,56 +1,87 @@
 import Konva from "konva";
-import React, { useRef, useEffect, useCallback } from "react";
-import { Text, Transformer, Circle, Image } from "react-konva";
-import { Html, useImage } from "react-konva-utils"
-import fontSizeUpIcon from './font-size-up-icon.png';
-import fontSizeDownIcon from './font-size-down-icon.png';
+import React, { useRef, useEffect, useCallback, useMemo, useState } from "react";
+import { Text, Transformer, Circle } from "react-konva";
+import { Html } from "react-konva-utils"
+import { TextInfo } from "./type";
+import { ActionKind, usePageContext } from "./Context";
+import { KonvaEventObject } from "konva/lib/Node";
+import { TextareaAutosize } from '@mui/base';
 
-const EDITOR_MIN_HEIGHT = 30;
+const EDITOR_MIN_WIDTH = 30;
+const offset = 4;
+const inputBackgroundColor = "#c8dde3";
 
-export const PreviewAndTransformer: React.FC<{
-  x:number;
-  y:number;
-  setPosition: (x:number, y:number)=> void;
+type Props = {
+  item: TextInfo;
+  maxWidth: number;
+};
 
-  fontSize: number;
-  upFontSize: () => void
-  downFontSize: () => void
+export const EditableText: React.FC<Props> = React.memo(({item, maxWidth}) => {
+  const {dispatch} = usePageContext();
 
-  width:number;
-  height:number;
-  setSize:((newWidth: number, newHeight: number) => void);
+  // TODO これらステートもコンテキストで管理する？
+  const [isEditing, setIsEditing] = useState(false);
 
-  isBold: boolean
-  toggleBold: () => void;
+  const startEditing = useCallback(() => {
+    setIsEditing(true);
+    dispatch({type: ActionKind.SET_SELECTED, payload: item})
+  }, [dispatch, item]);
 
-  text:string;
-  isSelected:boolean;
-  startTransforming: () => void;
-  startEditing: () => void;
-  remove: () => void;
-}> = ({
-  x,
-  y,
-  setPosition,
-  fontSize,
-  upFontSize,
-  downFontSize,
+  const startTransforming = useCallback(() => {
+    setIsEditing(false);
+    dispatch({type: ActionKind.SET_SELECTED, payload: item})
+  }, [dispatch, item]);
 
-  width,
-  height,
-  setSize,
+  const release = useCallback(() => {
+    setIsEditing(false);
+    dispatch({type: ActionKind.RELEASE_SELECTED})
+  }, [dispatch]);
 
-  text,
-  isBold,
-  toggleBold,
-  isSelected,
+  if (isEditing) {
+    return <Editor item={item} maxWidth={maxWidth} release={release}/>
+  }
+  return <Preview  item={item} maxWidth={maxWidth} startTransforming={startTransforming} startEditing={startEditing} />
+});
 
-  startTransforming,
-  startEditing,
-  remove,
-}) => {
+
+const Preview: React.FC<Props & {startTransforming: ()=>void; startEditing: ()=>void;}> = React.memo(({item, maxWidth, startTransforming, startEditing}) => {
+  const {state: {selected}, dispatch} = usePageContext();
+  const isSelected = useMemo(() => selected && selected.createdAt === item.createdAt,[item.createdAt, selected]);
+
+  const textAttrs = useMemo(() => {
+    const {createdAt, isBold, ...rest} = item;
+    return {...rest, fontStyle: isBold ? "bold" : "normal"}
+  },[item]);
+
+
   const textRef = useRef<Konva.Text>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
+
+
+
+  const move = useCallback((e: KonvaEventObject<DragEvent>) => {
+    const updated = {...item, x: e.target.x(), y: e.target.y()};
+    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: updated});
+  }, [dispatch, item]);
+
+  const remove = useCallback(() => dispatch({type: ActionKind.REMOVE_TEXT, payload: {createdAt: item.createdAt}}), [dispatch, item])
+  const deleteButtonRef = React.useRef<Konva.Circle>(null);
+
+
+  const handleResize = useCallback(() => {
+    const textNode = textRef.current;
+    if (textNode !== null) {
+      const width = textNode.width() * textNode.scaleX();
+      const height = textNode.height() * textNode.scaleY();
+      textNode.setAttrs({
+        width: width,
+        scaleX: 1
+      });
+      const updated = {createdAt: item.createdAt, width, height};
+      dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: updated});
+    }
+  }, [dispatch, item]);
+
 
   useEffect(() => {
     if (isSelected && transformerRef.current !== null && textRef.current !== null) {
@@ -63,58 +94,26 @@ export const PreviewAndTransformer: React.FC<{
     }
   }, [isSelected]);
 
-
-  const handleResize = useCallback(() => {
-    const textNode = textRef.current;
-    if (textNode !== null) {
-      const newWidth = textNode.width() * textNode.scaleX();
-      const newHeight = textNode.height() * textNode.scaleY();
-      textNode.setAttrs({
-        width: newWidth,
-        scaleX: 1
-      });
-      setSize(newWidth, newHeight);
-    }
-  }, [setSize]);
-
-
-  useEffect(() => {
-    // 初期表示時
-    handleResize();
-  }, [handleResize]);
-
-  const deleteButtonRef = React.useRef<Konva.Circle>(null);
-  const [fontSizeUpIconImage] = useImage(fontSizeUpIcon)
-  const [fontSizeDownIconImage] = useImage(fontSizeDownIcon)
-
   return (
     <>
       <Text
         ref={textRef}
-        // 位置
-        x={x}
-        y={y}
-        fontSize={fontSize}
-        lineHeight={1.4}
+        {...textAttrs}
+        lineHeight={1.4}  // TODO これもTextInfoに追加する？
         draggable
-        onDragEnd={(e) => setPosition(e.target.x(),e.target.y())}
-        // サイズ
-        width={width}
-        height={height}
-        // テキスト文字列
-        text={text}
-        fontStyle={isBold ? "bold" : "normal"}
+        onDragEnd={move}
         // シングル→変形、ダブル→編集
         onClick={startTransforming}
         onTap={startTransforming}
         onDblClick={startEditing}
         onDblTap={startEditing}
-        onTransform={handleResize}
+        // onTransform={handleResize}
         // その他スタイル
         fill="black"
         fontFamily="sans-serif"
         perfectDrawEnabled={false}
-      />
+        onTransform={handleResize}
+        />
       { isSelected && (
         <Transformer
           ref={transformerRef}
@@ -122,8 +121,11 @@ export const PreviewAndTransformer: React.FC<{
           rotateEnabled={false}
           flipEnabled={false}
           enabledAnchors={['middle-right','middle-left']}
-          boundBoxFunc={(_, newBox) => ({...newBox, width: Math.max(EDITOR_MIN_HEIGHT, newBox.width)})}
-        >
+          boundBoxFunc={(_, newBox) => ({
+            ...newBox,
+            width: Math.min(maxWidth, Math.max(EDITOR_MIN_WIDTH, newBox.width)),
+          })}
+          >
           <Circle
             radius={8}
             fill="red"
@@ -131,135 +133,43 @@ export const PreviewAndTransformer: React.FC<{
             onClick={remove}
             x={textRef.current ? textRef.current.width() : 0}
           />
-          <Image
-            image={fontSizeUpIconImage}
-            x={10}
-            y={textRef.current ? textRef.current.height() - 10 : 0}
-            width={36}
-            height={36}
-            shadowColor="gray"
-            shadowOffsetX={0}
-            shadowOffsetY={0}
-            shadowBlur={1}
-            onMouseOver={(e) => {
-              const shape = e.target;
-              document.body.style.cursor = 'pointer';
-              shape.scaleX(1.1);
-              shape.scaleY(1.1);
-            }}
-            onMouseOut={(e) => {
-              const shape = e.target;
-              document.body.style.cursor = 'default';
-              shape.scaleX(1);
-              shape.scaleY(1);
-            }}
-            onClick={upFontSize}
-          />
-
-          <Image
-            image={fontSizeDownIconImage}
-            x={55}
-            y={textRef.current ? textRef.current.height() - 10 : 0}
-            width={32}
-            height={32}
-            shadowColor="gray"
-            shadowOffsetX={0}
-            shadowOffsetY={0}
-            shadowBlur={1}
-            onMouseOver={(e) => {
-              const shape = e.target;
-              document.body.style.cursor = 'pointer';
-              shape.scaleX(1.1);
-              shape.scaleY(1.1);
-            }}
-            onMouseOut={(e) => {
-              const shape = e.target;
-              document.body.style.cursor = 'default';
-              shape.scaleX(1);
-              shape.scaleY(1);
-            }}
-            onClick={downFontSize}
-          />
-
-          <Text
-            text="B" 
-            x={100}
-            y={textRef.current ? textRef.current.height() - 5 : 0}
-            width={32}
-            height={32}
-            fontSize={20}
-            fill={isBold ? "black" : "gray"}
-            shadowColor="gray"
-            shadowOffsetX={0}
-            shadowOffsetY={0}
-            shadowBlur={1}
-            fontStyle={isBold ? "bold": "normal"}
-            onClick={toggleBold}
-            onMouseOver={(e) => {
-              const shape = e.target;
-              document.body.style.cursor = 'pointer';
-              shape.scaleX(1.1);
-              shape.scaleY(1.1);
-            }}
-            onMouseOut={(e) => {
-              const shape = e.target;
-              document.body.style.cursor = 'default';
-              shape.scaleX(1);
-              shape.scaleY(1);
-            }}
-          />
         </Transformer>
       )}
     </>
   );
-}
+});
 
 
 
-const offset = 4;
-const inputBackgroundColor = "#c8dde3";
-
-export const Editor: React.FC<{
-  x:number;
-  y:number;
-  width:number;
-  height:number;
-  text: string;
-  fontSize: number;
-  setText: (val: string) => void;
-  finishEditing: () => void;
-}> = ({
-  x,
-  y,
-  width,
-  height,
-  fontSize,
-  text,
-  setText,
-  finishEditing,
-}) => {
-  const wrapperStyle = { 
+const Editor: React.FC<Props & {release: () => void}> = ({item, release}) => {
+  const {dispatch} = usePageContext();
+  const wrapperStyle = {
     opacity: 1,
     borderRadius: `${offset}px`,
     padding: `${offset}px`,
     backgroundColor: inputBackgroundColor,
   };
 
-  const wrapperPosition = { x: x - offset, y: y - offset };
-  const style = getStyle(width, height, fontSize);
+  const wrapperPosition = { x: item.x - offset, y: item.y - offset };
+  const style = useMemo(() => {
+    return getStyle(item)
+  },[item]);
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.code === 'Enter' && !e.shiftKey) || e.code === 'Escape') {
-      finishEditing();
+      release();
     }
-  }, [finishEditing])
+  }, [release])
 
-  const onChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setText(e.currentTarget.value),[setText]);
+  const onChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: {...item, text: e.currentTarget.value}})
+  },[dispatch, item]);
+
 
   return (
     <Html groupProps={wrapperPosition} divProps={{ style:  wrapperStyle}}>
-      <textarea
-        value={text}
+      <TextareaAutosize
+        value={item.text}
         onChange={onChange}
         onKeyDown={onKeyDown}
         style={style}
@@ -267,13 +177,17 @@ export const Editor: React.FC<{
       />
     </Html>
   );
-}
+};
 
-function getStyle(width: number, height:number, fontSize: number) {
+
+
+function getStyle({width, fontSize, isBold} : TextInfo) {
   const isFirefox = navigator.userAgent.toLowerCase().indexOf("firefox") > -1;
   return {
     width,
-    height,
+    fontSize: `${fontSize}px`,
+    ...(isBold && {fontWeight: 'bold'}),
+    ...(!isFirefox && {margintop: "-4px"}),
     border: 'none',
     padding: '0px',
     margin: '0px',
@@ -281,11 +195,9 @@ function getStyle(width: number, height:number, fontSize: number) {
     outline: 'none',
     resize: 'none' as const,
     colour: 'black',
-    fontSize: `${fontSize}px`,
     lineHeight: '1.4',
     fontFamily: 'sans-serif',
     backgroundColor: inputBackgroundColor,
-    ...(!isFirefox && {margintop: "-4px"})
   };
 }
 
