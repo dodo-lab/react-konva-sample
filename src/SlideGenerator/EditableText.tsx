@@ -1,6 +1,6 @@
 import Konva from "konva";
-import React, { useRef, useEffect, useCallback, useMemo, useState } from "react";
-import { Text, Transformer, Circle } from "react-konva";
+import React, { useRef, useEffect, useCallback, useMemo } from "react";
+import { Text, Transformer as KonvaTransformer, Circle } from "react-konva";
 import { Html } from "react-konva-utils"
 import { TextInfo } from "./type";
 import { ActionKind, usePageContext } from "./Context";
@@ -17,36 +17,57 @@ type Props = {
 };
 
 export const EditableText: React.FC<Props> = React.memo(({item, maxWidth}) => {
-  const {dispatch} = usePageContext();
+  const {state: {selected, modeOnSelected: mode}} = usePageContext();
+  const isSelected = useMemo(() => selected && selected.createdAt === item.createdAt,[item.createdAt, selected]);
 
-  // TODO これらステートもコンテキストで管理する？
-  const [isEditing, setIsEditing] = useState(false);
-
-  const startEditing = useCallback(() => {
-    setIsEditing(true);
-    dispatch({type: ActionKind.SET_SELECTED, payload: item})
-  }, [dispatch, item]);
-
-  const startTransforming = useCallback(() => {
-    setIsEditing(false);
-    dispatch({type: ActionKind.SET_SELECTED, payload: item})
-  }, [dispatch, item]);
-
-  const release = useCallback(() => {
-    setIsEditing(false);
-    dispatch({type: ActionKind.RELEASE_SELECTED})
-  }, [dispatch]);
-
-  if (isEditing) {
-    return <Editor item={item} maxWidth={maxWidth} release={release}/>
-  }
-  return <Preview  item={item} maxWidth={maxWidth} startTransforming={startTransforming} startEditing={startEditing} />
+  if (isSelected && mode === 'transforming') return <Transformer  item={item} maxWidth={maxWidth} />;
+  if (isSelected && mode === 'editing') return <Editor  item={item} maxWidth={maxWidth} />;
+  return <Preview  item={item} maxWidth={maxWidth}  />;
 });
 
 
-const Preview: React.FC<Props & {startTransforming: ()=>void; startEditing: ()=>void;}> = React.memo(({item, maxWidth, startTransforming, startEditing}) => {
-  const {state: {selected}, dispatch} = usePageContext();
-  const isSelected = useMemo(() => selected && selected.createdAt === item.createdAt,[item.createdAt, selected]);
+const Preview: React.FC<Props> = React.memo(({item}) => {
+  const {dispatch} = usePageContext();
+
+  const textAttrs = useMemo(() => {
+    const {createdAt, isBold, ...rest} = item;
+    return {...rest, fontStyle: isBold ? "bold" : "normal"}
+  },[item]);
+
+  const textRef = useRef<Konva.Text>(null);
+
+  const move = useCallback((e: KonvaEventObject<DragEvent>) => {
+    const updated = {...item, x: e.target.x(), y: e.target.y()};
+    console.log("onDragEnd", updated)
+    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: updated});
+  }, [dispatch, item]);
+
+  const startEditing = useCallback(() => dispatch({type: ActionKind.START_EDITING, payload: item}), [dispatch, item]);
+  const startTransforming = useCallback(() => dispatch({type: ActionKind.START_TRANSFORMING, payload: item}), [dispatch, item]);
+
+  return (
+    <Text
+      ref={textRef}
+      {...textAttrs}
+      lineHeight={1.4}  // TODO これもTextInfoに追加する？
+      draggable
+      onDragEnd={move}
+      // シングル→変形、ダブル→編集
+      onClick={startTransforming}
+      onTap={startTransforming}
+      onDblClick={startEditing}
+      onDblTap={startEditing}
+      // その他スタイル
+      fill="black"
+      fontFamily="sans-serif"
+      perfectDrawEnabled={false}
+    />
+  );
+});
+
+// 選択済みである前提
+const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
+  const {dispatch} = usePageContext();
 
   const textAttrs = useMemo(() => {
     const {createdAt, isBold, ...rest} = item;
@@ -57,10 +78,9 @@ const Preview: React.FC<Props & {startTransforming: ()=>void; startEditing: ()=>
   const textRef = useRef<Konva.Text>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
 
-
-
   const move = useCallback((e: KonvaEventObject<DragEvent>) => {
     const updated = {...item, x: e.target.x(), y: e.target.y()};
+    console.log("onDragEnd", updated)
     dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: updated});
   }, [dispatch, item]);
 
@@ -82,9 +102,9 @@ const Preview: React.FC<Props & {startTransforming: ()=>void; startEditing: ()=>
     }
   }, [dispatch, item]);
 
-
+  // 初期表示時
   useEffect(() => {
-    if (isSelected && transformerRef.current !== null && textRef.current !== null) {
+    if (transformerRef.current !== null && textRef.current !== null) {
       transformerRef.current.nodes([textRef.current]);
       const layer = transformerRef.current.getLayer();
 
@@ -92,7 +112,10 @@ const Preview: React.FC<Props & {startTransforming: ()=>void; startEditing: ()=>
 
       layer.batchDraw();
     }
-  }, [isSelected]);
+  }, []);
+
+  const startEditing = useCallback(() => dispatch({type: ActionKind.START_EDITING, payload: item}), [dispatch, item]);
+  const startTransforming = useCallback(() => dispatch({type: ActionKind.START_TRANSFORMING, payload: item}), [dispatch, item]);
 
   return (
     <>
@@ -107,41 +130,37 @@ const Preview: React.FC<Props & {startTransforming: ()=>void; startEditing: ()=>
         onTap={startTransforming}
         onDblClick={startEditing}
         onDblTap={startEditing}
-        // onTransform={handleResize}
         // その他スタイル
         fill="black"
         fontFamily="sans-serif"
         perfectDrawEnabled={false}
         onTransform={handleResize}
         />
-      { isSelected && (
-        <Transformer
-          ref={transformerRef}
-          // 幅変更のみ許可
-          rotateEnabled={false}
-          flipEnabled={false}
-          enabledAnchors={['middle-right','middle-left']}
-          boundBoxFunc={(_, newBox) => ({
-            ...newBox,
-            width: Math.min(maxWidth, Math.max(EDITOR_MIN_WIDTH, newBox.width)),
-          })}
-          >
-          <Circle
-            radius={8}
-            fill="red"
-            ref={deleteButtonRef}
-            onClick={remove}
-            x={textRef.current ? textRef.current.width() : 0}
-          />
-        </Transformer>
-      )}
+      <KonvaTransformer
+        ref={transformerRef}
+        // 幅変更のみ許可
+        rotateEnabled={false}
+        flipEnabled={false}
+        enabledAnchors={['middle-right','middle-left']}
+        boundBoxFunc={(_, newBox) => ({
+          ...newBox,
+          width: Math.min(maxWidth, Math.max(EDITOR_MIN_WIDTH, newBox.width)),
+        })}
+        >
+        <Circle
+          radius={8}
+          fill="red"
+          ref={deleteButtonRef}
+          onClick={remove}
+          x={textRef.current ? textRef.current.width() : 0}
+        />
+      </KonvaTransformer>
     </>
   );
 });
 
-
-
-const Editor: React.FC<Props & {release: () => void}> = ({item, release}) => {
+// 選択済みである前提
+const Editor: React.FC<Props> = ({item}) => {
   const {dispatch} = usePageContext();
   const wrapperStyle = {
     opacity: 1,
@@ -157,9 +176,9 @@ const Editor: React.FC<Props & {release: () => void}> = ({item, release}) => {
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.code === 'Enter' && !e.shiftKey) || e.code === 'Escape') {
-      release();
+      dispatch({type: ActionKind.RELEASE_SELECTED})
     }
-  }, [release])
+  }, [dispatch])
 
   const onChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: {...item, text: e.currentTarget.value}})

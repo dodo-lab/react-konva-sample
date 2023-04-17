@@ -124,7 +124,7 @@ const ShowState: React.FC = () => {
   const value = JSON.stringify(state, null, 4);
   return (
     <Card variant="outlined" sx={{padding: 2}}>
-      <Box sx={{whiteSpace: "pre"}}>
+      <Box sx={{whiteSpace: "pre-wrap"}}>
         {value}
       </Box>
     </Card>

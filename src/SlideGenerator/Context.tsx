@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 
 const initialPageContext: PageState = {
   selected: undefined,
+  modeOnSelected: 'none',
   texts: [] as TextInfo[],
 } as const;
 
@@ -12,6 +13,8 @@ export enum ActionKind {
   INIT = 'INIT',
   SET_SELECTED = 'SET_SELECTED',
   RELEASE_SELECTED = 'RELEASE_SELECTED',
+  START_EDITING = 'START_EDITING',
+  START_TRANSFORMING = 'START_TRANSFORMING',
   ADD_TEXT = 'ADD_TEXT',
   REMOVE_TEXT = 'REMOVE_TEXT',
   UPDATE_SELECTED_TEXT = 'UPDATE_SELECTED_TEXT',
@@ -27,6 +30,14 @@ type Action =
     }
   | {
       type: ActionKind.RELEASE_SELECTED;
+    }
+  | {
+      type: ActionKind.START_EDITING;
+      payload: TextInfo;
+    }
+  | {
+      type: ActionKind.START_TRANSFORMING;
+      payload: TextInfo;
     }
   | {
       type: ActionKind.ADD_TEXT;
@@ -55,9 +66,29 @@ function reducer(state: PageState, action: Action): PageState {
     case ActionKind.INIT:
       return initialPageContext;
     case ActionKind.SET_SELECTED:
-      return {selected: action.payload, texts};
-      case ActionKind.RELEASE_SELECTED:
-        return {selected: undefined, texts};
+      return {
+        ...state,
+        selected: action.payload,
+        modeOnSelected: 'preview',
+      };
+    case ActionKind.RELEASE_SELECTED:
+      return {
+        ...state,
+        selected: undefined, // 開放する
+        modeOnSelected: 'none', // 開放する
+      };
+    case ActionKind.START_EDITING:
+      return {
+        ...state,
+        selected: action.payload,
+        modeOnSelected: 'editing',
+      };
+    case ActionKind.START_TRANSFORMING:
+      return {
+        ...state,
+        selected: action.payload,
+        modeOnSelected: 'transforming',
+      };
     case ActionKind.ADD_TEXT: {
       const newOne =  {
         ...action.payload,
@@ -65,34 +96,28 @@ function reducer(state: PageState, action: Action): PageState {
       };
 
       return {
+        ...state,
         selected: undefined, // 開放する
+        modeOnSelected: 'none', // 開放する
         texts: [...texts, newOne],
       };
     }
     case ActionKind.REMOVE_TEXT:
       return {
+        ...state,
         selected: undefined, // 開放する
+        modeOnSelected: 'none', // 開放する
         texts: texts.filter((one)=> one.createdAt !== action.payload.createdAt),
       };
     case ActionKind.UPDATE_SELECTED_TEXT: {
-      if (!selected || selected.createdAt !== action.payload.createdAt) {
-        return {
-          selected: undefined, // 開放する
-          texts,
-        };
-      }
+      const newTexts = texts.map((one) => one.createdAt === action.payload.createdAt ? {...one, ...action.payload} : one);
+      const newSelected = (selected && selected.createdAt === action.payload.createdAt) ? {...selected, ...action.payload} : selected;
 
       return {
-        selected: {...selected, ...action.payload},
-        texts: texts.map((one) => {
-          if (one.createdAt === action.payload.createdAt) {
-            return {...one, ...action.payload};
-          }
-
-          return one;
-        }),
+        ...state,
+        selected: newSelected,
+        texts: newTexts,
       };
-
     }
   }
 }

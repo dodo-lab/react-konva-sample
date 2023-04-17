@@ -13,5 +13,6 @@ export type TextInfo = {
 
 export type PageState = {
   selected: TextInfo | undefined,
+  modeOnSelected: 'none' | 'preview' | 'editing' |'transforming',
   texts: TextInfo[],
 };
