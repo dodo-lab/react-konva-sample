@@ -1,19 +1,11 @@
 import React from 'react';
-import './App.css';
-import DynamicText from './DynamicTextSample';
+import SlideGenerator from './SlideGenerator';
 import { Box } from '@mui/material';
 
-function App() {
-  return (
-    <>
-      <Box m={4}>
-        <DynamicText/>
-      </Box>
-      <Box m={4}>
-        <DynamicText/>
-      </Box>
-    </>
-  );
-}
+const App: React.FC = () => (
+  <Box m={4}>
+    <SlideGenerator/>
+  </Box>
+);
 
 export default App;
