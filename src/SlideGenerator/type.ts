@@ -6,6 +6,7 @@ export type TextInfo = {
   y: number;
   fontSize: number;
   width: number;
+  lineHeight: number;
   // height: number; フォントサイズ、幅によって適宜改行するので高さは保持しない
   text: string;
   isBold: boolean;

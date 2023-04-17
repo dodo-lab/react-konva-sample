@@ -32,6 +32,7 @@ const Content: React.FC = () => {
       x: 100, // 位置は適当
       y: 100, // // 位置は適当
       fontSize: 20,
+      lineHeight: 1.4,
       width: 200,
       text: '何か入力してください',
       isBold: false,
@@ -52,6 +53,7 @@ const Content: React.FC = () => {
       ...position,
       fontSize: 20,
       width: 200,
+      lineHeight: 1.4,
       text: '何か入力してください',
       isBold: false,
     }});

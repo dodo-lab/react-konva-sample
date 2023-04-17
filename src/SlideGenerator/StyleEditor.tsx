@@ -1,51 +1,108 @@
 import React, { useCallback } from 'react';
 import { Card, Box, Grid, Button, TextField, InputAdornment  } from '@mui/material';
 import { ActionKind, usePageContext } from './Context';
+import { TextInfo } from './type';
 
+type NumberAttrsInTextInfo = 'x' | 'y' | 'width' | 'lineHeight' | 'fontSize';
+
+type EditorSetting = {
+  min: number;
+  max: number;
+  step: number;
+};
+
+const EDITOR_SETTINGS = {
+  fontSize: {
+    max: 40,
+    min: 4,
+    step: 1,
+  },
+  lineHeight: {
+    max: 3,
+    min: 0.5,
+    step: 0.1,
+  },
+  width: { // TODO Stageサイズに合わせたい
+    max: 1000,
+    min: 10,
+    step: 1,
+  },
+  x: { // TODO Stageサイズに合わせたい
+    max: 1000,
+    min: 0,
+    step: 1,
+  },
+  y: { // TODO Stageサイズに合わせたい
+    max: 1000,
+    min: 0,
+    step: 1,
+  }
+} as const;
+
+const clamp = (num: number, {min, max, step}: EditorSetting) => Math.min(Math.max(num - num % step, min), max);
+const upAndClamp = (num: number, {min, max, step}: EditorSetting) => Math.min(Math.max(num - num % step + step, min), max);
+const downAndClamp = (num: number, {min, max, step}: EditorSetting) => Math.min(Math.max(num - num % step - step, min), max);
+
+
+const useNumberEditorFn = (attrName: keyof Pick<TextInfo, NumberAttrsInTextInfo>, setting: EditorSetting) => {
+  const {state: {selected}, dispatch} = usePageContext();
+
+  const up= useCallback(() => {
+    if (!selected) return;
+
+    const current = selected[attrName];
+    const clamped = upAndClamp(current, setting);
+
+    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: {
+      createdAt: selected.createdAt,
+      [attrName]: clamped,
+    }});
+
+  }, [attrName, dispatch, selected, setting]);
+
+  const down= useCallback(() => {
+    if (!selected) return;
+
+    const current = selected[attrName];
+    const clamped = downAndClamp(current, setting);
+
+    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: {
+      createdAt: selected.createdAt,
+      [attrName]: clamped,
+    }});
+
+  }, [attrName, dispatch, selected, setting]);
+
+  const set= useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (!selected) return;
+
+    const str = e.target.value;
+    if (str === '') return;
+
+    const num = Number(str)
+    if (Number.isNaN(num)) return;
+
+    const clamped = clamp(num, setting);
+
+    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: {
+      createdAt: selected.createdAt,
+      [attrName]: clamped,
+    }});
+  }, [attrName, dispatch, selected, setting]);
+
+  return {up, down, set}
+}
 
 export const StyleEditor: React.FC = () => {
   const {state: {selected}, dispatch} = usePageContext();
 
-  const updateFontSize= useCallback((fontSize: number) => {
-    if (!selected) return;
+  const widthFn = useNumberEditorFn('width', EDITOR_SETTINGS.width)
+  const fontSizeFn = useNumberEditorFn('fontSize', EDITOR_SETTINGS.fontSize)
+  const xFn = useNumberEditorFn('x', EDITOR_SETTINGS.x)
+  const yFn = useNumberEditorFn('y', EDITOR_SETTINGS.y)
+  const lineHeightFn = useNumberEditorFn('lineHeight', EDITOR_SETTINGS.lineHeight)
 
-    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: {
-      createdAt: selected.createdAt,
-      fontSize,
-    }});
-
-  }, [dispatch, selected]);
-
-  const updateWidth= useCallback((width: number) => {
-    if (!selected) return;
-
-    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: {
-      createdAt: selected.createdAt,
-      width,
-    }});
-
-  }, [dispatch, selected]);
-
-  const updatePositionX= useCallback((x: number) => {
-    if (!selected) return;
-
-    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: {
-      createdAt: selected.createdAt,
-      x,
-    }});
-
-  }, [dispatch, selected]);
-
-  const updatePositionY= useCallback((y: number) => {
-    if (!selected) return;
-
-    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: {
-      createdAt: selected.createdAt,
-      y,
-    }});
-
-  }, [dispatch, selected]);
-
+  // 太字
   const toggleFontStyle= useCallback(() => {
     if (!selected) return;
 
@@ -69,30 +126,44 @@ export const StyleEditor: React.FC = () => {
 
       <Grid item container direction="row" alignItems="center" spacing={2}>
         <Grid item>
-          <Box fontSize="h6.fontSize">Size：</Box>
+          <Box fontSize="h6.fontSize">Width：</Box>
         </Grid>
         <Grid item xs={8} container direction="row">
           <Grid item>
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              sx={{height: '100%'}}
+              onClick={widthFn.down}
+            >
+              -
+            </Button>
+          </Grid>
+
+          <Grid item>
             <TextField
               type="number"
+              inputProps={EDITOR_SETTINGS.width}
               value={selected?.width ?? 0}
               size='small'
-              sx={{width: '8rem'}}
+              sx={{width: '8rem', input: {textAlign: "center"}}}
               InputProps={{
                 endAdornment: <InputAdornment position="end">W</InputAdornment>
               }}
-              onChange={(e) => {
-                const str = e.target.value;
-                if (str === '') return;
-
-                const num = Number(str)
-                if (Number.isNaN(num)) return;
-
-                const newOne = Math.min(1000, Math.max(0, num));
-                updateWidth(newOne);
-              }}
+              onChange={widthFn.set}
             />
-
+          </Grid>
+          <Grid item>
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              sx={{height: '100%'}}
+              onClick={widthFn.up}
+            >
+              +
+            </Button>
           </Grid>
         </Grid>
       </Grid>
@@ -105,43 +176,27 @@ export const StyleEditor: React.FC = () => {
           <Grid item>
             <TextField
               type="number"
+              inputProps={EDITOR_SETTINGS.x}
               value={selected?.x ?? 0}
               size='small'
-              sx={{width: '8rem'}}
+              sx={{width: '8rem', input: {textAlign: 'right'}}}
               InputProps={{
                 endAdornment: <InputAdornment position="end">X</InputAdornment>
               }}
-              onChange={(e) => {
-                const str = e.target.value;
-                if (str === '') return;
-
-                const num = Number(str)
-                if (Number.isNaN(num)) return;
-
-                const newOne = Math.min(1000, Math.max(0, num));
-                updatePositionX(newOne);
-              }}
+              onChange={xFn.set}
             />
           </Grid>
           <Grid item>
             <TextField
               type="number"
+              inputProps={EDITOR_SETTINGS.y}
               value={selected?.y ?? 0}
               size='small'
-              sx={{width: '8rem'}}
+              sx={{width: '8rem', input: {textAlign: 'right'}}}
               InputProps={{
                 endAdornment: <InputAdornment position="end">Y</InputAdornment>
               }}
-              onChange={(e) => {
-                const str = e.target.value;
-                if (str === '') return;
-
-                const num = Number(str)
-                if (Number.isNaN(num)) return;
-
-                const newOne = Math.min(1000, Math.max(0, num));
-                updatePositionY(newOne);
-              }}
+              onChange={yFn.set}
             />
           </Grid>
         </Grid>
@@ -162,11 +217,7 @@ export const StyleEditor: React.FC = () => {
               color="inherit"
               size="small"
               sx={{height: '100%'}}
-              onClick={() => {
-                const current = selected?.fontSize ?? 0;
-                const newOne = Math.max(0, current - 1);
-                updateFontSize(newOne);
-              }}
+              onClick={fontSizeFn.down}
             >
               -
             </Button>
@@ -174,19 +225,11 @@ export const StyleEditor: React.FC = () => {
           <Grid item>
             <TextField
               type="number"
+              inputProps={EDITOR_SETTINGS.fontSize}
               value={selected?.fontSize ?? 0}
               size='small'
-              sx={{width: '4rem'}}
-              onChange={(e) => {
-                const str = e.target.value;
-                if (str === '') return;
-
-                const num = Number(str)
-                if (Number.isNaN(num)) return;
-
-                const newOne = Math.min(42, Math.max(0, num));
-                updateFontSize(newOne);
-              }}
+              sx={{width: '6rem',input: {textAlign: "center"}}}
+              onChange={fontSizeFn.set}
             />
           </Grid>
           <Grid item>
@@ -195,11 +238,47 @@ export const StyleEditor: React.FC = () => {
               color="inherit"
               size="small"
               sx={{height: '100%'}}
-              onClick={() => {
-                const current = selected?.fontSize ?? 0;
-                const newOne = Math.min(42, current + 1);
-                updateFontSize(newOne);
-              }}
+              onClick={fontSizeFn.up}
+            >
+              +
+            </Button>
+          </Grid>
+        </Grid>
+      </Grid>
+
+      <Grid item container direction="row" alignItems="center" spacing={2}>
+        <Grid item>
+          <Box fontSize="h6.fontSize">Line Height：</Box>
+        </Grid>
+        <Grid item xs={8} container direction="row">
+          <Grid item>
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              sx={{height: '100%'}}
+              onClick={lineHeightFn.down}
+            >
+              -
+            </Button>
+          </Grid>
+          <Grid item>
+            <TextField
+              type="number"
+              inputProps={EDITOR_SETTINGS.lineHeight}
+              value={selected?.lineHeight ?? 0}
+              size='small'
+              sx={{width: '6rem', input: {textAlign: "center"}}}
+              onChange={lineHeightFn.set}
+            />
+          </Grid>
+          <Grid item>
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              sx={{height: '100%'}}
+              onClick={lineHeightFn.up}
             >
               +
             </Button>
@@ -218,7 +297,7 @@ export const StyleEditor: React.FC = () => {
               color="inherit"
               size="small"
               sx={{height: '100%', fontWeight: 'bold'}}
-              onClick={() => toggleFontStyle()}
+              onClick={toggleFontStyle}
             >
               B
             </Button>

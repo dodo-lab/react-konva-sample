@@ -122,7 +122,6 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
       <Text
         ref={textRef}
         {...textAttrs}
-        lineHeight={1.4}  // TODO これもTextInfoに追加する？
         draggable
         onDragEnd={move}
         // シングル→変形、ダブル→編集
