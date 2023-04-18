@@ -12,8 +12,18 @@ export type TextInfo = {
   isBold: boolean;
 };
 
+export type ImageInfo = {
+  createdAt: string; // 一意に特定するキー(msecまで)
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  src: string;
+};
+
 export type PageState = {
-  selected: TextInfo | undefined,
+  selected: TextInfo | ImageInfo | undefined,
   modeOnSelected: 'none' | 'preview' | 'editing' |'transforming',
   texts: TextInfo[],
+  images: ImageInfo[],
 };

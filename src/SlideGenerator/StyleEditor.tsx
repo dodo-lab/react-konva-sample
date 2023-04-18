@@ -1,9 +1,10 @@
 import React, { useCallback } from 'react';
 import { Card, Box, Grid, Button, TextField, InputAdornment  } from '@mui/material';
 import { ActionKind, usePageContext } from './Context';
-import { TextInfo } from './type';
+import { ImageInfo, TextInfo } from './type';
 
 type NumberAttrsInTextInfo = 'x' | 'y' | 'width' | 'lineHeight' | 'fontSize';
+type NumberAttrsInImageInfo = 'x' | 'y' | 'width' | 'height';
 
 type EditorSetting = {
   min: number;
@@ -27,6 +28,11 @@ const EDITOR_SETTINGS = {
     min: 10,
     step: 1,
   },
+  height: { // TODO Stageサイズに合わせたい
+    max: 1000,
+    min: 10,
+    step: 1,
+  },
   x: { // TODO Stageサイズに合わせたい
     max: 1000,
     min: 0,
@@ -44,8 +50,8 @@ const upAndClamp = (num: number, {min, max, step}: EditorSetting) => Math.min(Ma
 const downAndClamp = (num: number, {min, max, step}: EditorSetting) => Math.min(Math.max(num - num % step - step, min), max);
 
 
-const useNumberEditorFn = (attrName: keyof Pick<TextInfo, NumberAttrsInTextInfo>, setting: EditorSetting) => {
-  const {state: {selected}, dispatch} = usePageContext();
+const useNumberEditorFnText = (selected: TextInfo, attrName: keyof Pick<TextInfo, NumberAttrsInTextInfo>, setting: EditorSetting) => {
+  const {dispatch} = usePageContext();
 
   const up= useCallback(() => {
     if (!selected) return;
@@ -93,14 +99,64 @@ const useNumberEditorFn = (attrName: keyof Pick<TextInfo, NumberAttrsInTextInfo>
   return {up, down, set}
 }
 
-export const StyleEditor: React.FC = () => {
-  const {state: {selected}, dispatch} = usePageContext();
 
-  const widthFn = useNumberEditorFn('width', EDITOR_SETTINGS.width)
-  const fontSizeFn = useNumberEditorFn('fontSize', EDITOR_SETTINGS.fontSize)
-  const xFn = useNumberEditorFn('x', EDITOR_SETTINGS.x)
-  const yFn = useNumberEditorFn('y', EDITOR_SETTINGS.y)
-  const lineHeightFn = useNumberEditorFn('lineHeight', EDITOR_SETTINGS.lineHeight)
+const useNumberEditorFnForImage = (selected: ImageInfo, attrName: keyof Pick<ImageInfo, NumberAttrsInImageInfo>, setting: EditorSetting) => {
+  const {dispatch} = usePageContext();
+
+  const up= useCallback(() => {
+    if (!selected) return;
+
+    const current = selected[attrName];
+    const clamped = upAndClamp(current, setting);
+
+    dispatch({type: ActionKind.UPDATE_SELECTED_IMAGE, payload: {
+      createdAt: selected.createdAt,
+      [attrName]: clamped,
+    }});
+
+  }, [attrName, dispatch, selected, setting]);
+
+  const down= useCallback(() => {
+    if (!selected) return;
+
+    const current = selected[attrName];
+    const clamped = downAndClamp(current, setting);
+
+    dispatch({type: ActionKind.UPDATE_SELECTED_IMAGE, payload: {
+      createdAt: selected.createdAt,
+      [attrName]: clamped,
+    }});
+
+  }, [attrName, dispatch, selected, setting]);
+
+  const set= useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (!selected) return;
+
+    const str = e.target.value;
+    if (str === '') return;
+
+    const num = Number(str)
+    if (Number.isNaN(num)) return;
+
+    const clamped = clamp(num, setting);
+
+    dispatch({type: ActionKind.UPDATE_SELECTED_IMAGE, payload: {
+      createdAt: selected.createdAt,
+      [attrName]: clamped,
+    }});
+  }, [attrName, dispatch, selected, setting]);
+
+  return {up, down, set}
+}
+
+export const TextStyleEditor: React.FC<{selected: TextInfo}> = ({selected}) => {
+  const {dispatch} = usePageContext();
+
+  const widthFn = useNumberEditorFnText(selected, 'width', EDITOR_SETTINGS.width)
+  const fontSizeFn = useNumberEditorFnText(selected, 'fontSize', EDITOR_SETTINGS.fontSize)
+  const xFn = useNumberEditorFnText(selected, 'x', EDITOR_SETTINGS.x)
+  const yFn = useNumberEditorFnText(selected, 'y', EDITOR_SETTINGS.y)
+  const lineHeightFn = useNumberEditorFnText(selected, 'lineHeight', EDITOR_SETTINGS.lineHeight)
 
   // 太字
   const toggleFontStyle= useCallback(() => {
@@ -311,3 +367,151 @@ export const StyleEditor: React.FC = () => {
 };
 
 
+
+
+
+export const ImageStyleEditor: React.FC<{selected: ImageInfo}> = ({selected}) => {
+  const {dispatch} = usePageContext();
+
+  const widthFn = useNumberEditorFnForImage(selected, 'width', EDITOR_SETTINGS.width)
+  const heightFn = useNumberEditorFnForImage(selected, 'height', EDITOR_SETTINGS.height)
+  const xFn = useNumberEditorFnForImage(selected, 'x', EDITOR_SETTINGS.x)
+  const yFn = useNumberEditorFnForImage(selected, 'y', EDITOR_SETTINGS.y)
+
+  return (
+    <Card variant="outlined" sx={{padding: 2}}>
+    <Grid
+      container
+      direction="column"
+      spacing={2}
+    >
+      <Grid item>
+        <Box fontSize="h5.fontSize">General</Box>
+      </Grid>
+
+      <Grid item container direction="row" alignItems="center" spacing={2} wrap="nowrap">
+        <Grid item>
+          <Box fontSize="h6.fontSize">Width：</Box>
+        </Grid>
+        <Grid item xs={8} container direction="row" wrap="nowrap">
+          <Grid item>
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              sx={{height: '100%'}}
+              onClick={widthFn.down}
+            >
+              -
+            </Button>
+          </Grid>
+
+          <Grid item>
+            <TextField
+              type="number"
+              inputProps={EDITOR_SETTINGS.width}
+              value={selected?.width ?? 0}
+              size='small'
+              sx={{width: '8rem', input: {textAlign: "center"}}}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">W</InputAdornment>
+              }}
+              onChange={widthFn.set}
+            />
+          </Grid>
+          <Grid item>
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              sx={{height: '100%'}}
+              onClick={widthFn.up}
+            >
+              +
+            </Button>
+          </Grid>
+        </Grid>
+      </Grid>
+
+      <Grid item container direction="row" alignItems="center" spacing={2} wrap="nowrap">
+        <Grid item>
+          <Box fontSize="h6.fontSize">Height：</Box>
+        </Grid>
+        <Grid item xs={8} container direction="row" wrap="nowrap">
+          <Grid item>
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              sx={{height: '100%'}}
+              onClick={heightFn.down}
+            >
+              -
+            </Button>
+          </Grid>
+
+          <Grid item>
+            <TextField
+              type="number"
+              inputProps={EDITOR_SETTINGS.height}
+              value={selected?.height ?? 0}
+              size='small'
+              sx={{width: '8rem', input: {textAlign: "center"}}}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">W</InputAdornment>
+              }}
+              onChange={heightFn.set}
+            />
+          </Grid>
+          <Grid item>
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              sx={{height: '100%'}}
+              onClick={heightFn.up}
+            >
+              +
+            </Button>
+          </Grid>
+        </Grid>
+      </Grid>
+
+      <Grid item container direction="row" alignItems="center" spacing={2} wrap="nowrap">
+        <Grid item>
+          <Box fontSize="h6.fontSize">Position：</Box>
+        </Grid>
+        <Grid item xs={8} container direction="row" wrap="nowrap">
+          <Grid item>
+            <TextField
+              type="number"
+              inputProps={EDITOR_SETTINGS.x}
+              value={selected?.x ?? 0}
+              size='small'
+              sx={{width: '8rem', input: {textAlign: 'right'}}}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">X</InputAdornment>
+              }}
+              onChange={xFn.set}
+            />
+          </Grid>
+          <Grid item>
+            <TextField
+              type="number"
+              inputProps={EDITOR_SETTINGS.y}
+              value={selected?.y ?? 0}
+              size='small'
+              sx={{width: '8rem', input: {textAlign: 'right'}}}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">Y</InputAdornment>
+              }}
+              onChange={yFn.set}
+            />
+          </Grid>
+        </Grid>
+      </Grid>
+
+    </Grid>
+    </Card>
+  );
+};
