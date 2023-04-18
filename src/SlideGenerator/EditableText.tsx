@@ -38,7 +38,6 @@ const Preview: React.FC<Props> = React.memo(({item}) => {
 
   const move = useCallback((e: KonvaEventObject<DragEvent>) => {
     const updated = {...item, x: e.target.x(), y: e.target.y()};
-    console.log("onDragEnd", updated)
     dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: updated});
   }, [dispatch, item]);
 
@@ -80,7 +79,6 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
 
   const move = useCallback((e: KonvaEventObject<DragEvent>) => {
     const updated = {...item, x: e.target.x(), y: e.target.y()};
-    console.log("onDragEnd", updated)
     dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: updated});
   }, [dispatch, item]);
 

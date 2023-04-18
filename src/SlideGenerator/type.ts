@@ -21,9 +21,19 @@ export type ImageInfo = {
   src: string;
 };
 
+export type LineInfo = {
+  createdAt: string; // 一意に特定するキー(msecまで)
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  stroke: 'black',
+};
+
 export type PageState = {
-  selected: TextInfo | ImageInfo | undefined,
+  selected: TextInfo | ImageInfo | LineInfo | undefined,
   modeOnSelected: 'none' | 'preview' | 'editing' |'transforming',
   texts: TextInfo[],
   images: ImageInfo[],
+  lines: LineInfo[],
 };

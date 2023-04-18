@@ -1,20 +1,29 @@
 import Konva from "konva";
 import React, { useRef, useEffect, useCallback, useMemo } from "react";
-import { Image, Transformer as KonvaTransformer, Circle } from "react-konva";
-import { ImageInfo } from "./type";
+import { Transformer as KonvaTransformer, Circle, Line } from "react-konva";
+import { LineInfo } from "./type";
 import { ActionKind, usePageContext } from "./Context";
 import { KonvaEventObject } from "konva/lib/Node";
-import useImage from 'use-image';
-
 
 const EDITOR_MIN_WIDTH = 30;
 
 type Props = {
-  item: ImageInfo;
+  item: LineInfo;
   maxWidth: number;
 };
 
-export const EditableImage: React.FC<Props> = React.memo(({item, maxWidth}) => {
+const convertInfoToAttrs = (info: LineInfo) => {
+  const {x, y, width, height, stroke} = info;
+  return {
+    x,
+    y,
+    points: [0, 0, width, 0],
+    stroke,
+    strokeWidth: height,
+  };
+};
+
+export const EditableLine: React.FC<Props> = React.memo(({item, maxWidth}) => {
   const {state: {selected, modeOnSelected: mode}} = usePageContext();
   const isSelected = useMemo(() => selected && selected.createdAt === item.createdAt,[item.createdAt, selected]);
 
@@ -26,32 +35,40 @@ export const EditableImage: React.FC<Props> = React.memo(({item, maxWidth}) => {
 const Preview: React.FC<Props> = React.memo(({item}) => {
   const {dispatch} = usePageContext();
 
-  const imageRef = useRef<Konva.Image>(null);
-
-  const [image] = useImage(item.src, 'anonymous');
+  const attrs = useMemo(() => convertInfoToAttrs(item),[item]);
+  const elementRef = useRef<Konva.Line>(null);
 
   const move = useCallback((e: KonvaEventObject<DragEvent>) => {
-    const updated = {...item, x: e.target.x(), y: e.target.y()};
-    console.log(item, updated)
-    dispatch({type: ActionKind.UPDATE_SELECTED_IMAGE, payload: updated});
+    const updated = {...item, x: e.target.x(), y:  e.target.y()};
+    dispatch({type: ActionKind.UPDATE_SELECTED_LINE, payload: updated});
   }, [dispatch, item]);
 
   const startTransforming = useCallback(() => dispatch({type: ActionKind.START_TRANSFORMING, payload: item}), [dispatch, item]);
 
+
+ // 初期表示時
+  useEffect(() => {
+    if (elementRef.current !== null) {
+      const layer = elementRef.current.getLayer();
+
+      if (!layer) return;
+
+      layer.batchDraw();
+    }
+  }, [item]);
+
   return (
-    <Image
-      image={image}
-      x={item.x}
-      y={item.y}
-      width={item.width}
-      height={item.height}
+    <Line
+      ref={elementRef}
+      {...attrs}
       draggable
-      ref={imageRef}
       onDragEnd={move}
-      // シングル→変形
+      // シングル→変形、ダブル→編集
       onClick={startTransforming}
       onTap={startTransforming}
+      // その他スタイル
       perfectDrawEnabled={false}
+      hitStrokeWidth={20}
     />
   );
 });
@@ -59,39 +76,39 @@ const Preview: React.FC<Props> = React.memo(({item}) => {
 // 選択済みである前提
 const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
   const {dispatch} = usePageContext();
-  const [image] = useImage(item.src, 'anonymous');
 
-  const imageRef = useRef<Konva.Image>(null);
+  const attrs = useMemo(() => convertInfoToAttrs(item),[item]);
+
+  const elementRef = useRef<Konva.Line>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
 
   const move = useCallback((e: KonvaEventObject<DragEvent>) => {
-    const updated = {...item, x: e.target.x(), y: e.target.y()};
-    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: updated});
+    const updated = {...item, x: e.target.x(), y:  e.target.y()};
+    dispatch({type: ActionKind.UPDATE_SELECTED_LINE, payload: updated});
   }, [dispatch, item]);
 
-  const remove = useCallback(() => dispatch({type: ActionKind.REMOVE_TEXT, payload: {createdAt: item.createdAt}}), [dispatch, item])
+  const remove = useCallback(() => dispatch({type: ActionKind.REMOVE_LINE, payload: {createdAt: item.createdAt}}), [dispatch, item])
   const deleteButtonRef = React.useRef<Konva.Circle>(null);
 
-
   const handleResize = useCallback(() => {
-    const textNode = imageRef.current;
-    if (textNode !== null) {
-      const width = textNode.width() * textNode.scaleX();
-      const height = textNode.height() * textNode.scaleY();
-      textNode.setAttrs({
+    const node = elementRef.current;
+    if (node !== null) {
+      const width = node.width() * node.scaleX();
+      const height = node.height() * node.scaleY();
+      node.setAttrs({
         width: width,
-        height: height,
         scaleX: 1
       });
       const updated = {createdAt: item.createdAt, width, height};
-      dispatch({type: ActionKind.UPDATE_SELECTED_IMAGE, payload: updated});
+      console.log(item, updated)
+      dispatch({type: ActionKind.UPDATE_SELECTED_LINE, payload: updated});
     }
   }, [dispatch, item]);
 
   // 初期表示時
   useEffect(() => {
-    if (transformerRef.current !== null && imageRef.current !== null) {
-      transformerRef.current.nodes([imageRef.current]);
+    if (transformerRef.current !== null && elementRef.current !== null) {
+      transformerRef.current.nodes([elementRef.current]);
       const layer = transformerRef.current.getLayer();
 
       if (!layer) return;
@@ -104,28 +121,24 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
 
   return (
     <>
-      <Image
-        image={image}
-        x={item.x}
-        y={item.y}
-        width={item.width}
-        height={item.height}
+      <Line
+        ref={elementRef}
+        {...attrs}
         draggable
-        ref={imageRef}
         onDragEnd={move}
-        // シングル→変形
+        // シングル→変形、ダブル→編集
         onClick={startTransforming}
         onTap={startTransforming}
-        perfectDrawEnabled={false}
+        // その他スタイル
         onTransform={handleResize}
-      />
-
+        hitStrokeWidth={20}
+        />
       <KonvaTransformer
         ref={transformerRef}
-        // アスペクト非変更は許可しない
+        // 幅変更のみ許可
         rotateEnabled={false}
         flipEnabled={false}
-        enabledAnchors={['bottom-right']}
+        enabledAnchors={[]}
         boundBoxFunc={(_, newBox) => ({
           ...newBox,
           width: Math.min(maxWidth, Math.max(EDITOR_MIN_WIDTH, newBox.width)),
@@ -136,10 +149,9 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
           fill="red"
           ref={deleteButtonRef}
           onClick={remove}
-          x={imageRef.current ? imageRef.current.width() : 0}
+          x={elementRef.current ? elementRef.current.width() : 0}
         />
       </KonvaTransformer>
     </>
   );
 });
-

@@ -2,12 +2,13 @@ import Konva from 'konva';
 import React, { useRef, useCallback } from 'react';
 import { Stage, Layer } from 'react-konva';
 import { EditableText } from './EditableText';
-import { Card, Box, Grid, Button } from '@mui/material';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import { Card, Box, Grid } from '@mui/material';
 import { ActionKind, WithContext, usePageContext } from './Context';
-import { ImageStyleEditor, TextStyleEditor } from './StyleEditor';
+import { ImageStyleEditor, LineStyleEditor, TextStyleEditor } from './ElementEditor';
 import { EditableImage } from './EditableImage';
-import { ImageInfo, TextInfo } from './type';
+import { ImageInfo, LineInfo, TextInfo } from './type';
+import { ElementTemplates } from './ElementTemplates';
+import { EditableLine } from './EditableLine';
 
 
 const STAGE_WIDTH = 600;
@@ -25,21 +26,9 @@ export default Component;
 
 
 const Content: React.FC = () => {
-  const {state: {selected, texts, images}, dispatch} = usePageContext();
+  const {state: {selected, texts, images, lines}, dispatch} = usePageContext();
 
   const stageRef = useRef<Konva.Stage>(null);
-
-  const onClickAddText = useCallback(()=> {
-    dispatch({type: ActionKind.ADD_TEXT, payload: {
-      x: 100, // 位置は適当
-      y: 100, // // 位置は適当
-      fontSize: 20,
-      lineHeight: 1.4,
-      width: 200,
-      text: '何か入力してください',
-      isBold: false,
-    }});
-  }, [dispatch]);
 
   const addElement = useCallback((e: React.DragEvent<HTMLDivElement>)=> {
     e.preventDefault();
@@ -73,47 +62,21 @@ const Content: React.FC = () => {
       }});
     }
 
+    if (elementType === 'line') {
+      dispatch({type: ActionKind.ADD_LINE, payload: {
+        ...position,
+        width: 200,
+        height: 3,
+        stroke: 'black',
+      }});
+    }
+
   }, [dispatch]);
 
   return (
     <Box m={4}>
       <Grid container direction="column"  spacing={4}>
-        <Grid item container direction="row" spacing={2} wrap="nowrap">
-        <Grid item>
-            <Button
-              variant="contained"
-              color="inherit"
-              startIcon={<DragIndicatorIcon />}
-              draggable="true"
-              onClick={onClickAddText}
-              onDragStart={(e) => {
-                e.dataTransfer.setData('type', 'text')
-              }}
-            >テキスト追加</Button>
-          </Grid>
-          <Grid item>
-            <Button
-              variant="contained"
-              color="inherit"
-              startIcon={<DragIndicatorIcon />}
-              draggable="true"
-              onClick={onClickAddText}
-            >
-              <img
-                alt="lion"
-                src="https://konvajs.org/assets/lion.png"
-                draggable="true"
-                onDragStart={(e) => {
-                  const html = e.dataTransfer.getData('text/html');
-                  const src = new DOMParser().parseFromString(html, "text/html").querySelector('img')?.src ?? '';
-                  console.log(src)
-                  e.dataTransfer.setData('type', 'image')
-                  e.dataTransfer.setData('src', src)
-                }}
-              />
-            </Button>
-          </Grid>
-        </Grid>
+        <ElementTemplates />
         <Grid item container direction="row" spacing={4} wrap="nowrap">
           <Grid item xs={8}>
             <Box
@@ -138,6 +101,7 @@ const Content: React.FC = () => {
                 <Layer>
                 {texts.map((item) => <EditableText key={item.createdAt} item={item} maxWidth={STAGE_WIDTH} />)}
                 {images.map((item) => <EditableImage key={item.createdAt} item={item} maxWidth={STAGE_WIDTH} />)}
+                {lines.map((item) => <EditableLine key={item.createdAt} item={item} maxWidth={STAGE_WIDTH} />)}
                 </Layer>
               </Stage>
             </Box>
@@ -157,6 +121,7 @@ const Content: React.FC = () => {
             }}>
               {isText(selected) && <TextStyleEditor selected={selected}/>}
               {isImage(selected) && <ImageStyleEditor selected={selected}/>}
+              {isLine(selected) && <LineStyleEditor selected={selected}/>}
             </Grid>
             <ShowState />
           </Grid>
@@ -178,5 +143,6 @@ const ShowState: React.FC = () => {
   );
 }
 
-const isText = (obj: TextInfo | ImageInfo | undefined) : obj is TextInfo => obj !== undefined && 'fontSize' in obj;
-const isImage = (obj: TextInfo | ImageInfo | undefined) : obj is ImageInfo => obj !== undefined && 'src' in obj;
+const isText = (obj: TextInfo | ImageInfo | LineInfo | undefined) : obj is TextInfo => obj !== undefined && 'fontSize' in obj;
+const isImage = (obj: TextInfo | ImageInfo | LineInfo | undefined) : obj is ImageInfo => obj !== undefined && 'src' in obj;
+const isLine = (obj: TextInfo | ImageInfo | LineInfo | undefined) : obj is LineInfo => obj !== undefined && 'stroke' in obj;
