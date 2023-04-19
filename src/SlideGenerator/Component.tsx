@@ -2,7 +2,7 @@ import Konva from 'konva';
 import React, { useRef, useCallback } from 'react';
 import { Stage, Layer } from 'react-konva';
 import { EditableText } from './EditableText';
-import { Card, Box, Grid } from '@mui/material';
+import { Card, Box, Grid, Button } from '@mui/material';
 import { ActionKind, WithContext, usePageContext } from './Context';
 import { ImageStyleEditor, LineStyleEditor, TextStyleEditor } from './ElementEditor';
 import { EditableImage } from './EditableImage';
@@ -29,6 +29,27 @@ const Content: React.FC = () => {
   const {state: {selected, texts, images, lines}, dispatch} = usePageContext();
 
   const stageRef = useRef<Konva.Stage>(null);
+
+
+  const downloadImage = useCallback(() => {
+    if (!stageRef.current) return
+
+    const dataUrl = stageRef.current.toDataURL({mimeType: 'image/png'});
+
+    const link = document.createElement('a');
+    // URL設定
+    link.href = dataUrl;
+
+    // ファイル名設定
+    const fileName = "sample.png";
+    link.setAttribute('download', fileName);
+
+    // ノードを追加。作成したlinkを小ノードとして追加
+    document.body.appendChild(link);
+    link.click();
+    // aタグをHTMLから除去
+    link.remove();
+  },[]);
 
   const addElement = useCallback((e: React.DragEvent<HTMLDivElement>)=> {
     e.preventDefault();
@@ -76,6 +97,10 @@ const Content: React.FC = () => {
   return (
     <Box m={4}>
       <Grid container direction="column"  spacing={4}>
+        <Grid item>
+          <Button color="primary" variant="contained" size="large" onClick={downloadImage}>画像取得</Button>
+        </Grid>
+
         <ElementTemplates />
         <Grid item container direction="row" spacing={4} wrap="nowrap">
           <Grid item xs={8}>
