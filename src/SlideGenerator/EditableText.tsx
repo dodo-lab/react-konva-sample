@@ -6,10 +6,13 @@ import { TextInfo } from "./type";
 import { ActionKind, usePageContext } from "./Context";
 import { KonvaEventObject } from "konva/lib/Node";
 import { TextareaAutosize } from '@mui/base';
+import { filterThreshold } from "./utils";
 
 const EDITOR_MIN_WIDTH = 30;
 const offset = 4;
 const inputBackgroundColor = "#c8dde3";
+
+
 
 type Props = {
   item: TextInfo;
@@ -42,7 +45,11 @@ const Preview: React.FC<Props> = React.memo(({item}) => {
   }, [dispatch, item]);
 
   const startEditing = useCallback(() => dispatch({type: ActionKind.START_EDITING, payload: item}), [dispatch, item]);
-  const startTransforming = useCallback(() => dispatch({type: ActionKind.START_TRANSFORMING, payload: item}), [dispatch, item]);
+  const startTransforming = useCallback(() => dispatch({ type: ActionKind.START_TRANSFORMING, payload: item }), [dispatch, item]);
+
+  useEffect(() => {
+    textRef.current?.cache();
+  }, [item]);
 
   return (
     <Text
@@ -58,8 +65,11 @@ const Preview: React.FC<Props> = React.memo(({item}) => {
       onDblTap={startEditing}
       // その他スタイル
       fill="black"
-      fontFamily="sans-serif"
+      fontFamily="'Noto Sans JP'"
       perfectDrawEnabled={false}
+      // filters={[filterThreshold]}
+      filters={[Konva.Filters.Threshold]}
+      threshold={0.2}
     />
   );
 });
@@ -92,13 +102,19 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
       const width = textNode.width() * textNode.scaleX();
       const height = textNode.height() * textNode.scaleY();
       textNode.setAttrs({
-        width: width,
-        scaleX: 1
+        width,
+        height,
+        scaleX: 1,
+        scaleY: 1,
       });
       const updated = {createdAt: item.createdAt, width, height};
       dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: updated});
     }
   }, [dispatch, item]);
+
+  useEffect(() => {
+    textRef.current?.cache();
+  }, [item]);
 
   // 初期表示時
   useEffect(() => {
@@ -129,16 +145,16 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
         onDblTap={startEditing}
         // その他スタイル
         fill="black"
-        fontFamily="sans-serif"
+        fontFamily="'Noto Sans JP'"
         perfectDrawEnabled={false}
         onTransform={handleResize}
+        filters={[filterThreshold]}
         />
       <KonvaTransformer
         ref={transformerRef}
-        // 幅変更のみ許可
         rotateEnabled={false}
         flipEnabled={false}
-        enabledAnchors={['middle-right','middle-left']}
+        enabledAnchors={['top-left', 'top-center', 'top-right', 'middle-right','middle-left', 'bottom-left', 'bottom-center', 'bottom-right']}
         boundBoxFunc={(_, newBox) => ({
           ...newBox,
           width: Math.min(maxWidth, Math.max(EDITOR_MIN_WIDTH, newBox.width)),
@@ -149,7 +165,8 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
           fill="red"
           ref={deleteButtonRef}
           onClick={remove}
-          x={textRef.current ? textRef.current.width() : 0}
+          x={textRef.current ? textRef.current.width()*0.5 : 0}
+          y={-40}
         />
       </KonvaTransformer>
     </>
@@ -212,7 +229,7 @@ function getStyle({width, fontSize, isBold} : TextInfo) {
     resize: 'none' as const,
     colour: 'black',
     lineHeight: '1.4',
-    fontFamily: 'sans-serif',
+    fontFamily: '"Noto Sans JP"',
     backgroundColor: inputBackgroundColor,
   };
 }

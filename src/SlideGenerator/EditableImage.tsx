@@ -1,10 +1,12 @@
 import Konva from "konva";
 import React, { useRef, useEffect, useCallback, useMemo } from "react";
 import { Image, Transformer as KonvaTransformer, Circle } from "react-konva";
+import {Node} from 'konva/lib/Node'
 import { ImageInfo } from "./type";
 import { ActionKind, usePageContext } from "./Context";
 import { KonvaEventObject } from "konva/lib/Node";
 import useImage from 'use-image';
+import { filterThreshold } from "./utils";
 
 
 const EDITOR_MIN_WIDTH = 30;
@@ -32,11 +34,15 @@ const Preview: React.FC<Props> = React.memo(({item}) => {
 
   const move = useCallback((e: KonvaEventObject<DragEvent>) => {
     const updated = {...item, x: e.target.x(), y: e.target.y()};
-    console.log(item, updated)
+    console.log('preview moved', updated);
     dispatch({type: ActionKind.UPDATE_SELECTED_IMAGE, payload: updated});
   }, [dispatch, item]);
 
-  const startTransforming = useCallback(() => dispatch({type: ActionKind.START_TRANSFORMING, payload: item}), [dispatch, item]);
+  useEffect(() => {
+    imageRef.current?.cache();
+  }, [image, item]);
+
+  const startTransforming = useCallback(() => dispatch({ type: ActionKind.START_TRANSFORMING, payload: item }), [dispatch, item]);
 
   return (
     <Image
@@ -52,6 +58,7 @@ const Preview: React.FC<Props> = React.memo(({item}) => {
       onClick={startTransforming}
       onTap={startTransforming}
       perfectDrawEnabled={false}
+      filters={[filterThreshold]}
     />
   );
 });
@@ -65,13 +72,12 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
   const transformerRef = useRef<Konva.Transformer>(null);
 
   const move = useCallback((e: KonvaEventObject<DragEvent>) => {
-    const updated = {...item, x: e.target.x(), y: e.target.y()};
-    dispatch({type: ActionKind.UPDATE_SELECTED_TEXT, payload: updated});
+    const updated = { ...item, x: e.target.x(), y: e.target.y() };
+    dispatch({type: ActionKind.UPDATE_SELECTED_IMAGE, payload: updated});
   }, [dispatch, item]);
 
   const remove = useCallback(() => dispatch({type: ActionKind.REMOVE_TEXT, payload: {createdAt: item.createdAt}}), [dispatch, item])
   const deleteButtonRef = React.useRef<Konva.Circle>(null);
-
 
   const handleResize = useCallback(() => {
     const textNode = imageRef.current;
@@ -87,6 +93,10 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
       dispatch({type: ActionKind.UPDATE_SELECTED_IMAGE, payload: updated});
     }
   }, [dispatch, item]);
+
+  useEffect(() => {
+    imageRef.current?.cache();
+  }, [image, item]);
 
   // 初期表示時
   useEffect(() => {
@@ -118,6 +128,7 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
         onTap={startTransforming}
         perfectDrawEnabled={false}
         onTransform={handleResize}
+        filters={[filterThreshold]}
       />
 
       <KonvaTransformer
@@ -136,7 +147,7 @@ const Transformer: React.FC<Props> = React.memo(({item, maxWidth}) => {
           fill="red"
           ref={deleteButtonRef}
           onClick={remove}
-          x={imageRef.current ? imageRef.current.width() : 0}
+          x={imageRef.current ? imageRef.current.width()*0.5 : 0}
         />
       </KonvaTransformer>
     </>
