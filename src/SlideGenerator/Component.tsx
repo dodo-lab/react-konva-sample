@@ -1,6 +1,7 @@
 import Konva from 'konva';
-import React, { useRef, useCallback } from 'react';
-import { Stage, Layer } from 'react-konva';
+import React, { useRef, useCallback, useEffect } from 'react';
+import { Stage, Layer, Rect } from 'react-konva';
+import {Node} from 'konva/lib/Node'
 import { EditableText } from './EditableText';
 import { Card, Box, Grid, Button } from '@mui/material';
 import { ActionKind, WithContext, usePageContext } from './Context';
@@ -112,11 +113,6 @@ const Content: React.FC = () => {
                 ref={stageRef}
                 width={STAGE_WIDTH}
                 height={STAGE_HIGHT}
-                onClick={(e) => {
-                  if (e.currentTarget._id === e.target._id) {
-                    dispatch({type: ActionKind.RELEASE_SELECTED})
-                  };
-                }}
                 style={{
                   width: STAGE_WIDTH,
                   height: STAGE_HIGHT,
@@ -124,9 +120,14 @@ const Content: React.FC = () => {
                 }}
               >
                 <Layer>
-                {texts.map((item) => <EditableText key={item.createdAt} item={item} maxWidth={STAGE_WIDTH} />)}
-                {images.map((item) => <EditableImage key={item.createdAt} item={item} maxWidth={STAGE_WIDTH} />)}
-                {lines.map((item) => <EditableLine key={item.createdAt} item={item} maxWidth={STAGE_WIDTH} />)}
+                  <Rect x={0} y={0} width={STAGE_WIDTH} height={STAGE_HIGHT} fill='white' onClick={(e) => {
+                    if (e.currentTarget._id === e.target._id) {
+                      dispatch({type: ActionKind.RELEASE_SELECTED})
+                    };
+                  }} />
+                  {texts.map((item) => <EditableText key={item.createdAt} item={item} maxWidth={STAGE_WIDTH} />)}
+                  {images.map((item) => <EditableImage key={item.createdAt} item={item} maxWidth={STAGE_WIDTH} />)}
+                  {lines.map((item) => <EditableLine key={item.createdAt} item={item} maxWidth={STAGE_WIDTH} />)}
                 </Layer>
               </Stage>
             </Box>
